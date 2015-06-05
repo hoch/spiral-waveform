@@ -1,0 +1,279 @@
+<!--
+@license
+Copyright (c) 2015 The Polymer Project Authors. All rights reserved.
+This code may only be used under the BSD style license found at http://polymer.github.io/LICENSE.txt
+The complete set of authors may be found at http://polymer.github.io/AUTHORS.txt
+The complete set of contributors may be found at http://polymer.github.io/CONTRIBUTORS.txt
+Code distributed by Google as part of the polymer project is also
+subject to an additional IP rights grant found at http://polymer.github.io/PATENTS.txt
+-->
+<link rel="import" href="../polymer/polymer.html">
+
+<script src="timeruler.js"></script>
+<script src="ampruler.js"></script>
+<script src="waveform.js"></script>
+
+<!--
+Audio waveform (time-domain representation) renderer.
+
+Example:
+
+    <waveform-renderer></waveform-renderer>
+
+@demo
+-->
+<dom-module id="waveform-renderer">
+
+  <style>
+    :host {
+      display: block;
+      box-sizing: border-box;
+    }
+  </style>
+
+  <template>
+    <canvas id="canvas" on-track="_handleTrack"></canvas>
+  </template>
+
+</dom-module>
+
+<script>
+
+  Polymer({
+
+    is: 'waveform-renderer',
+
+    properties: {
+
+      controller: Object,
+
+      renderedBuffer: Object,
+
+      ctx: Object,
+      cvsOff: Object,
+      ctxOff: Object,
+
+      timerRuler: Object,
+      ampRulers: Array,
+      waveformDrawers: Array,
+
+      width: Number,
+      height: Number,
+
+      start: Number,
+      end: Number,
+      absPeak: Number,
+      pixelPerSample: Number,
+
+      uiMode: String
+      
+    },
+
+    ready: function() {},
+
+    attached: function() {
+      // Create resources: canvas and context.
+      this.ctx = this.$.canvas.getContext('2d');
+      this.cvsOff = document.createElement('canvas');
+      this.ctxOff = this.cvsOff.getContext('2d');
+
+      this.uiMode = 'IDLE';
+    },
+
+    detached: function() {},
+
+
+    // Internal helpers.
+    
+    _findAbsPeak: function () {
+      if (!this.renderedBuffer)
+        return 0;
+
+      var numChannels = this.renderedBuffer.numberOfChannels;
+      var absPeak = 0.0;
+      for (var i = 0; i < numChannels; i++) {
+        var data = this.renderedBuffer.getChannelData(i);
+        for (var j = 0; j < data.length; j++) {
+          var absValue = Math.abs(data[j]);
+          if (absPeak < absValue)
+            absPeak = absValue;
+        }
+      }
+
+      return absPeak;
+    },
+
+    // FIX ME: zoom center does not work properly.
+    _zoomX: function (deltaY, zoomCenter) {
+      var factor = this.timeRuler.pixelsToSeconds(deltaY);
+      var anchor = this.start + this.timeRuler.pixelsToSeconds(zoomCenter - 42);
+
+      // Estimate start/end points.
+      var start = this.start + factor * anchor;
+      var end = this.end - factor * (this.renderedBuffer.duration - anchor);
+      start = Math.max(start, 0);
+      end = Math.min(end, this.renderedBuffer.duration);
+
+      // Zoom above the maximum zoom range: 0.001 seconds.
+      if (end - start > 0.001) {
+        this._updateView(start, end, this.absPeak);
+        this._notify('viewport-change', {
+          start: this.start,
+          end: this.end
+        });
+      }
+    },
+
+    // FIX ME: why 0.01?
+    _zoomY: function (deltaY) {
+      var factor = deltaY * 0.01;
+      var absPeak = Math.max(0.01, this.absPeak + factor);
+      this._updateView(this.start, this.end, absPeak);
+    },
+
+    _panX: function (deltaX) {
+      // Calculate deltaX in seconds and new start/end.
+      var deltaSec = this.timeRuler.pixelsToSeconds(deltaX);
+      var start = this.start - deltaSec;
+      var end = this.end - deltaSec;
+
+      // Pan only with the valid start/end position.
+      if (0 <= start && end < this.renderedBuffer.duration) {
+        this._updateView(start, end, this.absPeak);
+        this._notify('viewport-change', {
+          start: this.start,
+          end: this.end
+        });
+      }
+    },
+
+    _handleTrack: function (event) {
+      var pos = event.detail;
+      switch(pos.state) {
+        case 'start':
+          if (pos.x < 42)
+            this.uiMode = 'ZOOM_Y';
+          else
+            this.uiMode = '';
+          break;
+        case 'track':
+          if (this.uiMode !== 'ZOOM_Y')
+            this.uiMode = (pos.ddx * pos.ddx < pos.ddy * pos.ddy) ? 'ZOOM_X' : 'PAN_X';
+          switch (this.uiMode) {
+            case 'ZOOM_X':
+              this._zoomX(pos.ddy, pos.x);
+              break;
+            case 'ZOOM_Y':
+              this._zoomY(pos.ddy);
+              break;
+            case 'PAN_X':
+              this._panX(pos.ddx);
+              break;
+          }
+          break;
+        case 'end':
+          status = 'IDLE';
+          break;
+      }
+    },
+
+    _resizeToFit: function () {
+      // Fit into the container element.
+      this.width = this.parentNode.offsetWidth;
+      this.height = this.parentNode.offsetHeight;
+      this.$.canvas.width = this.cvsOff.width = this.width;
+      this.$.canvas.height = this.cvsOff.height = this.height;
+
+      // Update view.
+      this._updateView();
+    },
+
+    _updateView: function (start, end, absPeak) {
+      if (!this.renderedBuffer)
+        return;
+
+      this.start = (start || 0);
+      this.end = (end || this.renderedBuffer.duration);
+      this.absPeak = (absPeak || this._findAbsPeak());
+      this._render();
+    },
+
+    _render: function () {
+      if (!this.renderedBuffer)
+        return;
+
+      // Clear the canvas.
+      this.ctxOff.clearRect(0, 0, this.width, this.height);
+
+      // Iterate waveform drawers by channel numbers.
+      var numChannels = this.renderedBuffer.numberOfChannels;
+      for (var i = 0; i < numChannels; i++) {
+        this.waveformDrawers[i].draw(this.start, this.end, this.absPeak);
+        this.ampRulers[i].draw(this.absPeak);
+      }
+
+      // Draw time ruler.
+      this.timeRuler.draw(this.start, this.end);
+
+      // Copy the off-screen canvas to the on-screen one.
+      this.ctx.drawImage(this.cvsOff, 0, 0, this.width, this.height);
+    },
+
+    _notify: function (eventType, data) {
+      if (this.controller)
+        this.controller.notify('waveform', eventType, data);
+    },
+
+
+    // Public API.
+    
+    setController: function (contrller) {
+      this.controller = controller;
+    },
+
+    setBuffer: function (buffer) {
+      if (!buffer)
+        return;
+
+      // Perform resizing when the buffer loaded.
+      this._resizeToFit();
+
+      this.renderedBuffer = buffer;
+      var numChannels = this.renderedBuffer.numberOfChannels;
+
+      // FIXME: hard-coded width and height.
+      var ampRulerWidth = 42;
+      var timeRulerHeight = 32;
+      var timeRulerWidth = this.width - ampRulerWidth;
+      var channelHeight = (this.height - timeRulerHeight) / numChannels;
+      
+      this.timeRuler = WaveformRenderer.createTimeRuler(this.ctxOff,
+        ampRulerWidth, 0, timeRulerWidth);
+
+      this.ampRulers = [];
+      this.waveformDrawers = [];
+      for (var i = 0; i < numChannels; i++) {
+        var yOffset = timeRulerHeight + i * channelHeight;
+        var channelData = this.renderedBuffer.getChannelData(i);
+        this.ampRulers[i] = WaveformRenderer.createAmpRuler(this.ctxOff,
+          0, yOffset, ampRulerWidth, channelHeight);
+        this.waveformDrawers[i] = WaveformRenderer.createWaveformDrawer(this.ctxOff,
+          ampRulerWidth, yOffset, timeRulerWidth, channelHeight);
+        this.waveformDrawers[i].setSampleData(channelData, this.renderedBuffer.sampleRate);
+      }
+
+      // By default: optimum view.
+      this._updateView();
+    },
+
+    setViewRange: function (start, end) {
+      this._updateView(start, end, this.absPeak)
+    },
+
+    resize: function () {
+      this._resizeToFit();
+    }
+
+  });
+
+</script>
