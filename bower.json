@@ -1,10 +1,10 @@
 {
-  "name": "waveform-renderer",
+  "name": "spiral-waveform",
   "version": "0.0.1",
   "authors": [
     "Hongchan Choi <hongchan.choi@gmail.com>"
   ],
-  "description": "Custom element for rendering audio waveform (Polymer 1.0)",
+  "description": "A Polymer element for rendering audio waveform",
   "keywords": [
     "web-component",
     "web-components",
@@ -13,9 +13,9 @@
     "waveform",
     "time-domain"
   ],
-  "main": "waveform-renderer.html",
+  "main": "spiral-waveform.html",
   "license": "http://polymer.github.io/LICENSE.txt",
-  "homepage": "https://github.com/hoch/waveform-renderer/",
+  "homepage": "https://github.com/hoch/spiral-waveform/",
   "ignore": [
     "/.*",
     "/test/",

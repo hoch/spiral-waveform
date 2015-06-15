@@ -1,3 +1,3 @@
-# waveform-renderer
+# spiral-waveform
 
-Custom element for rendering audio waveform (Polymer 1.0)
+A Polymer element for rendering audio waveform (Polymer 1.0).
