@@ -23,14 +23,14 @@
     <script>
       var renderer = document.querySelector('#renderer');
 
-      var context = new OfflineAudioContext(2, 44100 * 2, 44100);
+      var context = new OfflineAudioContext(2, 44100 * 5, 44100);
       
       var osc1 = context.createOscillator();
       var mod = context.createGain();
       var osc2 = context.createOscillator();
 
-      osc1.frequency.value = 3;
-      osc2.frequency.value = 11;
+      osc1.frequency.value = 60;
+      osc2.frequency.value = 440;
       mod.gain.value = 20;
 
       osc1.connect(mod);

@@ -8,7 +8,7 @@
     colorBackground: '#EEE',
     colorCenterLine: '#B0BEC5',
     colorBorder: '#FFF',
-    SPPThreshold: 50.0
+    SPPThreshold: 10.0
   };
 
   /**
@@ -45,9 +45,7 @@
     var endIndex = Math.floor(end * this.sampleRate);
 
     // SamplesPerPixel
-    var SPP = (endIndex - startIndex) / this.width; 
-
-    // console.log(SPP, 1/SPP);
+    var SPP = (endIndex - startIndex) / this.width;
 
     // Push down context.
     this.ctx.save();
