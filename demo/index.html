@@ -8,39 +8,54 @@
     <script src="../../webcomponentsjs/webcomponents-lite.js"></script>
     <link rel="import" href="../spiral-waveform.html">
     <style>
-      #wrapper {
-        width: 50%;
-        height: 512px;
+      body {
+        margin: 0;
+        padding: 0;
       }
     </style>
   </head>
   <body>
 
-    <div id="wrapper">
-      <spiral-waveform id="renderer"></spiral-waveform>
-    </div>
-    
+    <spiral-waveform id="renderer"></spiral-waveform>
+
     <script>
       var renderer = document.querySelector('#renderer');
-
       var context = new OfflineAudioContext(2, 44100 * 5, 44100);
+      var timeout;
+
+      function generateBuffer() {
+        var osc1 = context.createOscillator();
+        var mod = context.createGain();
+        var osc2 = context.createOscillator();
+
+        osc1.frequency.value = 33;
+        osc2.frequency.value = 417;
+        mod.gain.value = 1473;
+
+        osc1.connect(mod);
+        mod.connect(osc2.frequency);
+        osc2.connect(context.destination);
+        osc1.start();
+        osc2.start();  
+      }
+
+      function resizeToFit() {
+        var width = window.innerWidth;
+        var height = window.innerHeight;
+        renderer.setSize(width, height);
+      }
+
+      window.addEventListener('WebComponentsReady', function () {
+        generateBuffer();
+        context.startRendering().then(function (buffer) {
+          renderer.setBuffer(buffer);
+          resizeToFit();
+        });
+      });
       
-      var osc1 = context.createOscillator();
-      var mod = context.createGain();
-      var osc2 = context.createOscillator();
-
-      osc1.frequency.value = 60;
-      osc2.frequency.value = 440;
-      mod.gain.value = 20;
-
-      osc1.connect(mod);
-      mod.connect(osc2.frequency);
-      osc2.connect(context.destination);
-      osc1.start();
-      osc2.start();
-
-      context.startRendering().then(function (buffer) {
-        renderer.setBuffer(buffer);
+      window.addEventListener('resize', function () {
+        clearTimeout(timeout);
+        timeout = setTimeout(resizeToFit, 250);
       });
     </script>
 

@@ -2,7 +2,7 @@
 
   var STYLE = {
     width: 400,
-    height: 192,
+    height: 128,
     color: '#03A9F4',
     colorClipped: '#E91E63',
     colorBackground: '#EEE',
@@ -159,6 +159,7 @@
           this.ctx.fillRect(x - 1.5, yOffset - 1.5, 3, 3);
 
         maxValue = 0;
+        maxValueIndex = i;
         px = x;
       }
 

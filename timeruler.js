@@ -9,11 +9,12 @@
   // class-static styles.
   var STYLE = {
     height: 32,
-    color: '#37474F',
+    color: '#546E7A',
+    colorShadow: '#37474F',
     gridWidth: 55,
     gridLineWidth: 1.0,
     gridColor: '#CFD8DC',
-    font: '11px Arial'
+    font: '11.5px Arial'
   };
 
   /**
@@ -83,7 +84,6 @@
 
   // start, end as in seconds.
   TimeRuler.prototype.draw = function (start, end) {
-
     // TO FIX: optimize this.
     this.calculateGrid(end - start);
 
@@ -102,14 +102,18 @@
     this.ctx.fillStyle = STYLE.color;
     this.ctx.strokeStyle = STYLE.gridColor;
     this.ctx.lineWidth = STYLE.gridLineWidth;
+    this.ctx.font = STYLE.font;
     this.ctx.textAlign = 'left';
 
     // Push down.
     this.ctx.save();
     this.ctx.translate(this.x, this.y);
 
-    // clear background for ruler.
+    // clear background and draw border.
+    this.ctx.fillStyle = STYLE.color;
     this.ctx.fillRect(0, 0, this.width, this.height);
+    this.ctx.fillStyle = STYLE.colorShadow;
+    this.ctx.fillRect(0, this.height - 3, this.width, 3);
 
     // Draw grid.
     this.ctx.beginPath();

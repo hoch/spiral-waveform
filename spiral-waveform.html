@@ -24,12 +24,44 @@ Example:
       display: block;
       box-sizing: border-box;
     }
+
+    canvas {
+      display: block;
+    }
+
+    #divWrapper {
+      /**/
+    }
+
+    #divScrollable {
+      width: 100%;
+      overflow-y: scroll;
+      overflow-x: hidden;
+    }
+
+    #canvasTimeRuler {
+      /*background-color: #ecc;*/
+    }
+
+    #canvasWaveform {
+      /*background-color: #cec;*/
+    }
+
+    #canvasMiniMap {
+      background-color: #cce;
+    }
   </style>
 
   <template>
-    <canvas id="timerRuler"></canvas>
-    <canvas id="waveform" on-track="_handleTrack"></canvas>
-    <canvas id="miniMap"></canvas>
+
+    <div id="divWrapper">
+      <canvas id="canvasTimeRuler" on-track="_onTrackTimeRuler"></canvas>
+      <div id="divScrollable">
+        <canvas id="canvasWaveform" on-track="_onTrackWaveform"></canvas>
+      </div>
+      <canvas id="canvasMiniMap" on-track="_onTrackMiniMap"></canvas>
+    </div>
+
   </template>
 
 </dom-module>
@@ -42,54 +74,134 @@ Example:
 
     properties: {
 
-      controller: Object,
+      _width: Number,
+      _height: Number,
 
-      renderedBuffer: Object,
+      _heightTimeRuler: Number,
+      _heightMiniMap: Number,
+      _heightWaveform: Number,
+      _minHeightChannel: Number,
+      _widthAmpRuler: Number,
 
-      ctx: Object,
-      cvsOff: Object,
-      ctxOff: Object,
+      _ctxTimeRuler: Object,
+      _ctxWaveform: Object,
+      _ctxMiniMap: Object,
 
-      timerRuler: Object,
-      ampRulers: Array,
-      waveformDrawers: Array,
+      _mTimeRuler: Object,
+      _mAmpRulers: Array,
+      _mWaveformDrawers: Array,
 
-      width: Number,
-      height: Number,
+      _viewStart: Number,
+      _viewEnd: Number,
+      _viewPeak: Number,
+      _uiMode: String,
 
-      start: Number,
-      end: Number,
-      absPeak: Number,
-      pixelPerSample: Number,
+      _audioBuffer: Object,
 
-      uiMode: String
-      
+      _controller: Object,
+      _componentId: String,
+
     },
 
-    ready: function() {},
+    /** Helpers **/
 
-    attached: function() {
-      // Create resources: canvas and context.
-      this.ctx = this.$.canvas.getContext('2d');
-      this.cvsOff = document.createElement('canvas');
-      this.ctxOff = this.cvsOff.getContext('2d');
-
-      this.uiMode = 'IDLE';
+    _initialize: function () {
+      this._width = 400;
+      this._height = 400;
+      this._heightTimeRuler = 32;
+      this._widthAmpRuler = 48;
+      this._heightMiniMap = 48;
+      this._minHeightChannel = 192;
+      this._componentId = 'spiral-waveform';
+      this._uiMode = 'IDLE';
     },
 
-    detached: function() {},
+    _createContext: function () {
+      this._ctxTimeRuler = this.$.canvasTimeRuler.getContext('2d');
+      this._ctxWaveform = this.$.canvasWaveform.getContext('2d');
+      this._ctxMiniMap = this.$.canvasMiniMap.getContext('2d');
+    },
+
+    _doDOMLayout: function () {
+        // Use style.{height, width} for DIVs.
+      this.$.divWrapper.style.width = this._width + 'px';
+      this.$.divWrapper.style.height = this._height + 'px';
+      this.$.divScrollable.style.height = (this._height - this._heightTimeRuler - this._heightMiniMap) + 'px';
+
+      // clientWidth is useful to get the internal area width without the scroll
+      // bar width.
+      var clientWidth = this.$.divScrollable.clientWidth;
+      var offsetWidth = this.$.divScrollable.offsetWidth;
+      var numChannels = this._audioBuffer ? this._audioBuffer.numberOfChannels : 1;
+      this.$.canvasTimeRuler.width = clientWidth;
+      this.$.canvasTimeRuler.height = this._heightTimeRuler;
+      this.$.canvasWaveform.width = clientWidth;
+      this.$.canvasWaveform.height = this._minHeightChannel * numChannels;
+      this.$.canvasMiniMap.width = offsetWidth;
+      this.$.canvasMiniMap.height = this._heightMiniMap;
+    },
+
+    _createModules: function () {
+      var numChannels = this._audioBuffer.numberOfChannels;
+      var waveformWidth = this.$.divScrollable.clientWidth;
+
+      // TimeRuler.
+      this._mTimeRuler = WaveformRenderer.createTimeRuler(this._ctxTimeRuler,
+        this._widthAmpRuler, 0, waveformWidth);
+
+      // AmpRulers + Waveforms.
+      this._mAmpRulers = [];
+      this._mWaveformDrawers = [];
+      for (var i = 0; i < numChannels; i++) {
+        var channelData = this._audioBuffer.getChannelData(i);
+        var yOffset = i * this._minHeightChannel;
+        this._mAmpRulers[i] = WaveformRenderer.createAmpRuler(this._ctxWaveform,
+          0, yOffset, this._widthAmpRuler, this._minHeightChannel);
+        this._mWaveformDrawers[i] = WaveformRenderer.createWaveformDrawer(this._ctxWaveform,
+          this._widthAmpRuler, yOffset, waveformWidth, this._minHeightChannel);
+        this._mWaveformDrawers[i].setSampleData(channelData, this._audioBuffer.sampleRate);
+      }
+    },
 
 
-    // Internal helpers.
-    
-    _findAbsPeak: function () {
-      if (!this.renderedBuffer)
+    /** Render-related **/
+
+    _updateView: function (start, end, absPeak) {
+      if (!this._audioBuffer)
+        return;
+
+      this._viewStart = (start || this._viewStart || 0);
+      this._viewEnd = (end || this._viewEnd || this._audioBuffer.duration);
+      this._absPeak = (absPeak || this._findAbsolutePeak());
+      this._render();
+    },
+
+    _render: function () {
+      if (!this._audioBuffer)
+        return;
+
+      // Iterate channels for waveform drawing.
+      var numChannels = this._audioBuffer.numberOfChannels;
+      for (var i = 0; i < numChannels; i++) {
+        this._mWaveformDrawers[i].draw(this._viewStart, this._viewEnd, this._absPeak);
+        this._mAmpRulers[i].draw(this._absPeak);
+      }
+
+      // Draw time ruler at the end.
+      this._mTimeRuler.draw(this._viewStart, this._viewEnd);
+    },
+
+
+    /** UI helpers */
+
+    _findAbsolutePeak: function () {
+      if (!this._audioBuffer)
         return 0;
 
-      var numChannels = this.renderedBuffer.numberOfChannels;
+      var numChannels = this._audioBuffer.numberOfChannels;
       var absPeak = 0.0;
       for (var i = 0; i < numChannels; i++) {
-        var data = this.renderedBuffer.getChannelData(i);
+        var data = this._audioBuffer.getChannelData(i);
         for (var j = 0; j < data.length; j++) {
           var absValue = Math.abs(data[j]);
           if (absPeak < absValue)
@@ -100,63 +212,75 @@ Example:
       return absPeak;
     },
 
-    // FIX ME: zoom center does not work properly.
     _zoomX: function (deltaY, zoomCenter) {
-      var factor = this.timeRuler.pixelsToSeconds(deltaY);
-      var anchor = this.start + this.timeRuler.pixelsToSeconds(zoomCenter - 42);
 
-      // Estimate start/end points.
-      var start = this.start + factor * anchor;
-      var end = this.end - factor * (this.renderedBuffer.duration - anchor);
-      start = Math.max(start, 0);
-      end = Math.min(end, this.renderedBuffer.duration);
+      // Original algorithm.
+      var delta = this._mTimeRuler.pixelsToSeconds(deltaY) * 2.66;
+      var anchor = this._viewStart + this._mTimeRuler.pixelsToSeconds(zoomCenter - this._widthAmpRuler);
+      var r1 = (anchor - this._viewStart) / (this._viewEnd - this._viewStart);
+      var r2 = (this._viewEnd - anchor) / (this._viewEnd - this._viewStart);
+      var newStart = this._viewStart + delta * r1;
+      var newEnd = this._viewEnd - delta * r2;
+      newStart = Math.max(newStart, 0);
+      newEnd = Math.min(newEnd, this._audioBuffer.duration);
 
-      // Zoom above the maximum zoom range: 0.001 seconds.
-      if (end - start > 0.001) {
-        this._updateView(start, end, this.absPeak);
+      // Zoom above the maximum zoom range: 0.003 seconds. (3ms ~ 128 samples)
+      if (newEnd - newStart > 0.003) {
+        this._updateView(newStart, newEnd, this._absPeak);
+
+        // And notify the controller UI touched.
         this._notify('viewport-change', {
-          start: this.start,
-          end: this.end
+          start: newStart,
+          end: newEnd
         });
       }
     },
 
-    // FIX ME: why 0.01?
+    // TODO: why 0.01?
     _zoomY: function (deltaY) {
       var factor = deltaY * 0.01;
-      var absPeak = Math.max(0.01, this.absPeak + factor);
-      this._updateView(this.start, this.end, absPeak);
+      var absPeak = Math.max(0.01, this._absPeak + factor);
+      this._updateView(this._start, this._end, absPeak);
     },
 
     _panX: function (deltaX) {
       // Calculate deltaX in seconds and new start/end.
-      var deltaSec = this.timeRuler.pixelsToSeconds(deltaX);
-      var start = this.start - deltaSec;
-      var end = this.end - deltaSec;
+      var deltaSec = this._mTimeRuler.pixelsToSeconds(deltaX);
+      var start = this._viewStart - deltaSec;
+      var end = this._viewEnd - deltaSec;
 
       // Pan only with the valid start/end position.
-      if (0 <= start && end < this.renderedBuffer.duration) {
-        this._updateView(start, end, this.absPeak);
+      if (0 <= start && end < this._audioBuffer.duration) {
+        this._updateView(start, end, this._absPeak);
+
+        // And notify the controller UI touched.
         this._notify('viewport-change', {
-          start: this.start,
-          end: this.end
+          start: start,
+          end: end
         });
       }
     },
 
-    _handleTrack: function (event) {
+
+    /** Track handlers */
+
+    _onTrackTimeRuler: function () {},
+
+    _onTrackWaveform: function (event) {
+      if (!this._audioBuffer)
+        return;
+
       var pos = event.detail;
+
       switch(pos.state) {
         case 'start':
-          if (pos.x < 42)
-            this.uiMode = 'ZOOM_Y';
-          else
-            this.uiMode = '';
+          this._uiMode = (pos.x < this._widthAmpRuler) ? 'ZOOM_Y' : '';
           break;
         case 'track':
-          if (this.uiMode !== 'ZOOM_Y')
-            this.uiMode = (pos.ddx * pos.ddx < pos.ddy * pos.ddy) ? 'ZOOM_X' : 'PAN_X';
-          switch (this.uiMode) {
+          if (this._uiMode !== 'ZOOM_Y')
+            this._uiMode = (pos.ddx * pos.ddx < pos.ddy * pos.ddy) ? 'ZOOM_X' : 'PAN_X';
+          
+          switch (this._uiMode) {
             case 'ZOOM_X':
               this._zoomX(pos.ddy, pos.x);
               break;
@@ -167,108 +291,73 @@ Example:
               this._panX(pos.ddx);
               break;
           }
+
           break;
         case 'end':
-          status = 'IDLE';
+          this._uiMode = 'IDLE';
           break;
       }
     },
 
-    _resizeToFit: function () {
-      // Fit into the container element.
-      this.width = this.parentNode.offsetWidth;
-      this.height = this.parentNode.offsetHeight;
-      this.$.canvas.width = this.cvsOff.width = this.width;
-      this.$.canvas.height = this.cvsOff.height = this.height;
+    _onTrackMiniMap: function () {},
 
-      // Update view.
+
+    /** communication */
+
+    _notify: function (eventType, data) {
+      if (this._controller)
+        this._controller.postMessage(this._componentId, eventType, data);
+    },
+
+
+    /** Polymer life cycle: created -> ready -> attached **/
+
+    created: function () {
+      this._initialize();
+    },
+
+    ready: function() {
+      // When initialized, DOM layout requires a bit of delay to figure out
+      // computed width of DIVs. Then Context 2Ds from canvases.
+      this.async(function () {
+        this._createContext();
+        this._doDOMLayout();
+      }, 1);
+    },
+
+    attached: function () {
+
+    },
+
+    /** Public Method **/
+
+    setController: function (controller) {
+      this._controller = controller;
+    },
+
+    setSize: function (width, height) {
+      this._width = width;
+      this._height = height;
+
+      this._doDOMLayout();
+      this._createModules();
       this._updateView();
     },
 
-    _updateView: function (start, end, absPeak) {
-      if (!this.renderedBuffer)
+    setBuffer: function (audioBuffer) {
+      if (!audioBuffer)
         return;
 
-      this.start = (start || 0);
-      this.end = (end || this.renderedBuffer.duration);
-      this.absPeak = (absPeak || this._findAbsPeak());
-      this._render();
-    },
+      this._audioBuffer = audioBuffer;
 
-    _render: function () {
-      if (!this.renderedBuffer)
-        return;
-
-      // Clear the canvas.
-      this.ctxOff.clearRect(0, 0, this.width, this.height);
-
-      // Iterate waveform drawers by channel numbers.
-      var numChannels = this.renderedBuffer.numberOfChannels;
-      for (var i = 0; i < numChannels; i++) {
-        this.waveformDrawers[i].draw(this.start, this.end, this.absPeak);
-        this.ampRulers[i].draw(this.absPeak);
-      }
-
-      // Draw time ruler.
-      this.timeRuler.draw(this.start, this.end);
-
-      // Copy the off-screen canvas to the on-screen one.
-      this.ctx.drawImage(this.cvsOff, 0, 0, this.width, this.height);
-    },
-
-    _notify: function (eventType, data) {
-      if (this.controller)
-        this.controller.notify('waveform', eventType, data);
-    },
-
-
-    // Public API.
-    
-    setController: function (contrller) {
-      this.controller = controller;
-    },
-
-    setBuffer: function (buffer) {
-      if (!buffer)
-        return;
-
-      // Perform resizing when the buffer loaded.
-      this._resizeToFit();
-
-      this.renderedBuffer = buffer;
-      var numChannels = this.renderedBuffer.numberOfChannels;
-
-      // FIXME: hard-coded width and height.
-      var ampRulerWidth = 42;
-      var timeRulerHeight = 32;
-      var timeRulerWidth = this.width - ampRulerWidth;
-      var channelHeight = (this.height - timeRulerHeight) / numChannels;
-      
-      this.timeRuler = WaveformRenderer.createTimeRuler(this.ctxOff,
-        ampRulerWidth, 0, timeRulerWidth);
-
-      this.ampRulers = [];
-      this.waveformDrawers = [];
-      for (var i = 0; i < numChannels; i++) {
-        var yOffset = timeRulerHeight + i * channelHeight;
-        var channelData = this.renderedBuffer.getChannelData(i);
-        this.ampRulers[i] = WaveformRenderer.createAmpRuler(this.ctxOff,
-          0, yOffset, ampRulerWidth, channelHeight);
-        this.waveformDrawers[i] = WaveformRenderer.createWaveformDrawer(this.ctxOff,
-          ampRulerWidth, yOffset, timeRulerWidth, channelHeight);
-        this.waveformDrawers[i].setSampleData(channelData, this.renderedBuffer.sampleRate);
-      }
-
-      // By default: optimum view.
+      // Handle layout and create new modules.
+      this._doDOMLayout();
+      this._createModules();
       this._updateView();
     },
 
     setViewRange: function (start, end) {
-      this._updateView(start, end, this.absPeak)
-    },
-
-    resize: function () {
-      this._resizeToFit();
+      this._updateView(start, end, this._absPeak);
     }
 
   });

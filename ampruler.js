@@ -3,11 +3,12 @@
   var STYLE = {
     width: 38,
     height: 192,
-    color: '#37474F',
+    color: '#546E7A',
+    colorShadow: '#37474F',
     gridHeight: 28,
     colorGrid: '#CFD8DC',
     colorBorder: '#FFF',
-    font: '11px Arial'
+    font: '11.5px Arial'
   };
 
   /**
@@ -27,7 +28,7 @@
     this.yCenter = this.height / 2;
 
     // Set font once.
-    this.ctx.font = STYLE.rulerFont;
+    this.ctx.font = STYLE.font;
     this.gridGain = 0.2;
   };
 
@@ -78,13 +79,17 @@
     this.ctx.strokeStyle = STYLE.colorGrid;
     this.ctx.lineWidth = STYLE.gridLineWidth;
     this.ctx.textAlign = 'right';
+    this.ctx.font = STYLE.font;
 
     // Push down.
     this.ctx.save();
     this.ctx.translate(this.x, this.y);
 
-    // clear background for ruler.
+    // clear background and draw border.
+    this.ctx.fillStyle = STYLE.color;
     this.ctx.fillRect(0, 0, this.width, this.height);
+    this.ctx.fillStyle = STYLE.colorShadow;
+    this.ctx.fillRect(this.width - 3, 0, 3, this.height);
 
     // Draw grid.
     this.ctx.beginPath();
