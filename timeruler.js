@@ -1,12 +1,5 @@
-// TimeRuler class definition.
+(function (SpiralWaveform) {
 
-// TODO
-// - support samples (time unit)
-// - draw subdivisions
-
-(function (WaveformRenderer) {
-
-  // class-static styles.
   var STYLE = {
     height: 32,
     color: '#546E7A',
@@ -19,11 +12,6 @@
 
   /**
    * @class TimeRuler
-   * @param {[type]} ctx    [description]
-   * @param {[type]} x      [description]
-   * @param {[type]} y      [description]
-   * @param {[type]} width  [description]
-   * @param {[type]} height [description]
    */
   function TimeRuler(ctx, x, y, width, height) {
     this.initialize(ctx, x, y, width, height);
@@ -131,8 +119,8 @@
     this.ctx.restore();
   };
 
-  WaveformRenderer.createTimeRuler = function (ctx, x, y, width, height) {
+  SpiralWaveform.createTimeRuler = function (ctx, x, y, width, height) {
     return new TimeRuler(ctx, x, y, width, height);
   };
 
-})(WaveformRenderer = {});
+})(SpiralWaveform = {});

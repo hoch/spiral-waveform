@@ -1,4 +1,4 @@
-(function (WaveformRenderer) {
+(function (SpiralWaveform) {
 
   var STYLE = {
     width: 400,
@@ -78,8 +78,7 @@
     this.ctx.restore();
   };
 
-  WaveformDrawer.prototype._drawWithSubsampling = 
-    function (startIndex, endIndex, SPP, maxPeak) {
+  WaveformDrawer.prototype._drawWithSubsampling = function (startIndex, endIndex, SPP, maxPeak) {
 
     // Initial conditions.
     var blockStart = startIndex;
@@ -121,8 +120,7 @@
     this.ctx.stroke();
   };
 
-  WaveformDrawer.prototype._drawWithLinearInterpolation = 
-    function (startIndex, endIndex, SPP, maxPeak) {
+  WaveformDrawer.prototype._drawWithLinearInterpolation = function (startIndex, endIndex, SPP, maxPeak) {
 
     // Need to draw only if necessary: numSamplesToDraw < numPixels
     // Thus SPP < 1.0.
@@ -167,27 +165,11 @@
       x += 1 / SPP;
     }
 
-    // while (x <= this.width) {
-    //   // Draw only when the advance is bigger than one pixel.
-    //   if (x - px >= 1) {
-    //     value = this.data[index++];
-    //     value = Math.min(1.0, Math.max(-1.0, value/maxPeak));
-    //     yOffset = (1 - value) * this.yCenter;
-    //     // Handle the first sample.
-    //     if (x === 0)
-    //       this.ctx.moveTo(x, yOffset);
-    //     this.ctx.lineTo(x, yOffset);
-    //     this.ctx.fillRect(x - 1.5, yOffset - 1.5, 3, 3); // draw a blob head.    
-    //     px = x;
-    //   }      
-    //   x += 1 / SPP; // advance pixels-per-sample.
-    // }
-
     this.ctx.stroke();
   };
 
-  WaveformRenderer.createWaveformDrawer = function (ctx, x, y, width, height) {
+  SpiralWaveform.createWaveformDrawer = function (ctx, x, y, width, height) {
     return new WaveformDrawer(ctx, x, y, width, height);
   };
 
-})(WaveformRenderer);
+})(SpiralWaveform);

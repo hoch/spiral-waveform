@@ -12,47 +12,99 @@
         margin: 0;
         padding: 0;
       }
+
+      .element-info {
+        padding: 1.0em;
+        margin-bottom: 1.0em;
+        box-shadow: 2px 0 5px #607D8B;
+        color: #263238;
+        background-color: #ECEFF1;
+        font-family: sans-serif;
+      }
+
+      .element-demo {
+        padding: 1.0em;
+        font-family: sans-serif;
+      }
     </style>
   </head>
-  <body>
 
-    <spiral-waveform id="renderer"></spiral-waveform>
+  <body class="fullbleed">
+    <div class="vertical layout fit">
+      <div class="element-info">
+
+        <!-- element description -->
+        <h1><code>&lt;spiral-waveform&gt;</code></h1>
+        <p>Draws the time-domain representation of <code>AudioBuffer</code>
+          which can be navigated or zoomed by dragging the waveform with the
+          mouse horizontally or vertically. Zooming in and out the amplitude can
+          be done by dragging the amplitude ruler vertically.</p>
+        <p>Displaying individual channels of a multi-channel audio buffer is
+          supported and the view port can be scrolled when the contents overflow
+          the specified size.</p>
+        <p>This is design to be used with
+          <code>&lt;spiral-minimap&gt;</code>.</p>
+
+      </div>
+      <div class="element-demo">
+
+        <!-- demo -->
+        <spiral-waveform id="renderer"></spiral-waveform>
+        <div id="dump"></div>
+
+      </div>
+    </div>
 
     <script>
       var renderer = document.querySelector('#renderer');
-      var context = new OfflineAudioContext(2, 44100 * 5, 44100);
+      var container = document.querySelector('#dump');
+
+      var context = new OfflineAudioContext(3, 44100 * 0.5, 44100);
       var timeout;
 
       function generateBuffer() {
         var osc1 = context.createOscillator();
-        var mod = context.createGain();
         var osc2 = context.createOscillator();
+        var osc3 = context.createOscillator();
+        var merger = context.createChannelMerger(3);
 
-        osc1.frequency.value = 33;
-        osc2.frequency.value = 417;
-        mod.gain.value = 1473;
+        osc1.frequency.value = 55;
+        osc2.frequency.value = 55;
+        osc3.frequency.value = 55;
+        osc2.type = 'sawtooth';
+        osc3.type = 'square';
 
-        osc1.connect(mod);
-        mod.connect(osc2.frequency);
-        osc2.connect(context.destination);
+        osc1.connect(merger, 0, 0);
+        osc2.connect(merger, 0, 1);
+        osc3.connect(merger, 0, 2);
+        merger.connect(context.destination);
         osc1.start();
-        osc2.start();  
+        osc2.start();
+        osc3.start();
       }
 
       function resizeToFit() {
-        var width = window.innerWidth;
-        var height = window.innerHeight;
+        var width = window.innerWidth * 0.95;
+        var height = 500;
         renderer.setSize(width, height);
       }
+
+      var controller = {
+        postMessage: function (id, type, data) {
+          dump.textContent = id + '::' + type +
+            ' (' + data.start.toFixed(3) + ', ' + data.end.toFixed(3) + ')';
+        }
+      };
 
       window.addEventListener('WebComponentsReady', function () {
         generateBuffer();
         context.startRendering().then(function (buffer) {
-          renderer.setBuffer(buffer);
+          renderer.setController(controller);
+          renderer.setAudioBuffer(buffer);
           resizeToFit();
         });
       });
-      
+
       window.addEventListener('resize', function () {
         clearTimeout(timeout);
         timeout = setTimeout(resizeToFit, 250);

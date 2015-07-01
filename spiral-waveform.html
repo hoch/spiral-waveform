@@ -9,7 +9,10 @@ MIT License. Copyright (c) 2015 Hongchan Choi. All rights reserved.
 <script src="waveform.js"></script>
 
 <!--
-Audio waveform (time-domain representation) renderer.
+Draws the time-domain representation of AudioBuffer which can be navigated or
+zoomed by dragging the waveform with the mouse horizontally or vertically.
+Zooming in and out the amplitude can be done by dragging the amplitude ruler
+vertically.
 
 Example:
 
@@ -30,25 +33,13 @@ Example:
     }
 
     #divWrapper {
-      /**/
+      background-color: #FAFAFA;
     }
 
     #divScrollable {
       width: 100%;
       overflow-y: scroll;
       overflow-x: hidden;
-    }
-
-    #canvasTimeRuler {
-      /*background-color: #ecc;*/
-    }
-
-    #canvasWaveform {
-      /*background-color: #cec;*/
-    }
-
-    #canvasMiniMap {
-      background-color: #cce;
     }
   </style>
 
@@ -59,7 +50,6 @@ Example:
       <div id="divScrollable">
         <canvas id="canvasWaveform" on-track="_onTrackWaveform"></canvas>
       </div>
-      <canvas id="canvasMiniMap" on-track="_onTrackMiniMap"></canvas>
     </div>
 
   </template>
@@ -78,14 +68,12 @@ Example:
       _height: Number,
 
       _heightTimeRuler: Number,
-      _heightMiniMap: Number,
       _heightWaveform: Number,
       _minHeightChannel: Number,
       _widthAmpRuler: Number,
 
       _ctxTimeRuler: Object,
       _ctxWaveform: Object,
-      _ctxMiniMap: Object,
 
       _mTimeRuler: Object,
       _mAmpRulers: Array,
@@ -110,7 +98,6 @@ Example:
       this._height = 400;
       this._heightTimeRuler = 32;
       this._widthAmpRuler = 48;
-      this._heightMiniMap = 48;
       this._minHeightChannel = 192;
       this._componentId = 'spiral-waveform';
       this._uiMode = 'IDLE';
@@ -119,14 +106,13 @@ Example:
     _createContext: function () {
       this._ctxTimeRuler = this.$.canvasTimeRuler.getContext('2d');
       this._ctxWaveform = this.$.canvasWaveform.getContext('2d');
-      this._ctxMiniMap = this.$.canvasMiniMap.getContext('2d');
     },
 
     _doDOMLayout: function () {
         // Use style.{height, width} for DIVs.
       this.$.divWrapper.style.width = this._width + 'px';
       this.$.divWrapper.style.height = this._height + 'px';
-      this.$.divScrollable.style.height = (this._height - this._heightTimeRuler - this._heightMiniMap) + 'px';
+      this.$.divScrollable.style.height = (this._height - this._heightTimeRuler) + 'px';
 
       // clientWidth is useful to get the internal area width without the scroll
       // bar width.
@@ -137,8 +123,6 @@ Example:
       this.$.canvasTimeRuler.height = this._heightTimeRuler;
       this.$.canvasWaveform.width = clientWidth;
       this.$.canvasWaveform.height = this._minHeightChannel * numChannels;
-      this.$.canvasMiniMap.width = offsetWidth;
-      this.$.canvasMiniMap.height = this._heightMiniMap;
     },
 
     _createModules: function () {
@@ -146,7 +130,7 @@ Example:
       var waveformWidth = this.$.divScrollable.clientWidth;
 
       // TimeRuler.
-      this._mTimeRuler = WaveformRenderer.createTimeRuler(this._ctxTimeRuler,
+      this._mTimeRuler = SpiralWaveform.createTimeRuler(this._ctxTimeRuler,
         this._widthAmpRuler, 0, waveformWidth);
 
       // AmpRulers + Waveforms.
@@ -155,9 +139,9 @@ Example:
       for (var i = 0; i < numChannels; i++) {
         var channelData = this._audioBuffer.getChannelData(i);
         var yOffset = i * this._minHeightChannel;
-        this._mAmpRulers[i] = WaveformRenderer.createAmpRuler(this._ctxWaveform,
+        this._mAmpRulers[i] = SpiralWaveform.createAmpRuler(this._ctxWaveform,
           0, yOffset, this._widthAmpRuler, this._minHeightChannel);
-        this._mWaveformDrawers[i] = WaveformRenderer.createWaveformDrawer(this._ctxWaveform,
+        this._mWaveformDrawers[i] = SpiralWaveform.createWaveformDrawer(this._ctxWaveform,
           this._widthAmpRuler, yOffset, waveformWidth, this._minHeightChannel);
         this._mWaveformDrawers[i].setSampleData(channelData, this._audioBuffer.sampleRate);
       }
@@ -254,7 +238,7 @@ Example:
         this._updateView(start, end, this._absPeak);
 
         // And notify the controller UI touched.
-        this._notify('viewport-change', {
+        this._notify('viewrange-change', {
           start: start,
           end: end
         });
@@ -299,8 +283,6 @@ Example:
       }
     },
 
-    _onTrackMiniMap: function () {},
-
 
     /** communication */
 
@@ -325,16 +307,23 @@ Example:
       }, 1);
     },
 
-    attached: function () {
+    attached: function () {},
 
-    },
 
-    /** Public Method **/
-
+    /**
+     * Sets the controller object for reporting the local state change.
+     * @param {Object} controller A controller object. This typically is a
+     *                            message router.
+     */
     setController: function (controller) {
       this._controller = controller;
     },
 
+    /**
+     * Sets the size of the instance. This triggers the redraw of visualization.
+     * @param {Number} width  Width in pixel.
+     * @param {Number} height Height in pixel.
+     */
     setSize: function (width, height) {
       this._width = width;
       this._height = height;
@@ -344,7 +333,11 @@ Example:
       this._updateView();
     },
 
-    setBuffer: function (audioBuffer) {
+    /**
+     * Sets the audio buffer object to visualize.
+     * @param {Object} audioBuffer AudioBuffer object to be rendered.
+     */
+    setAudioBuffer: function (audioBuffer) {
       if (!audioBuffer)
         return;
 
@@ -356,10 +349,15 @@ Example:
       this._updateView();
     },
 
+    /**
+     * Sets start and end points of view range.
+     * @param {Number} start Region start position in seconds.
+     * @param {Number} end   Region end position in seconds.
+     */
     setViewRange: function (start, end) {
       this._updateView(start, end, this._absPeak);
     }
-
+    
   });
 
 </script>

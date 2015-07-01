@@ -1,4 +1,4 @@
-(function (WaveformRenderer) {
+(function (SpiralWaveform) {
 
   var STYLE = {
     width: 38,
@@ -13,7 +13,6 @@
 
   /**
    * @class AmpRuler
-   * 
    */
   function AmpRuler(ctx, x, y, width, height) {
     this.initialize(ctx, x, y, width, height);
@@ -120,8 +119,8 @@
     this.ctx.restore();
   };
 
-  WaveformRenderer.createAmpRuler = function (ctx, x, y, width, height) {
+  SpiralWaveform.createAmpRuler = function (ctx, x, y, width, height) {
     return new AmpRuler(ctx, x, y, width, height);
   };
 
-})(WaveformRenderer);
+})(SpiralWaveform);
