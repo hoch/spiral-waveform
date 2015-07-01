@@ -4,14 +4,17 @@
   "authors": [
     "Hongchan Choi <hongchan.choi@gmail.com>"
   ],
-  "description": "A Polymer element for rendering audio waveform",
+  "description": "A Polymer element draws an interactive multi-channel waveform of AudioBuffer",
   "keywords": [
     "web-component",
     "web-components",
     "polymer",
     "audio",
+    "spiral",
+    "web-audio",
     "waveform",
-    "time-domain"
+    "time-domain",
+    "multi-channel"
   ],
   "main": "spiral-waveform.html",
   "license": "http://polymer.github.io/LICENSE.txt",
@@ -22,8 +25,7 @@
     "/demo/"
   ],
   "dependencies": {
-    "polymer": "Polymer/polymer#^1.0.0",
-    "paper-dialog-scrollable": "PolymerElements/paper-dialog-scrollable#^1.0.0"
+    "polymer": "Polymer/polymer#^1.0.0"
   },
   "devDependencies": {
     "iron-component-page": "PolymerElements/iron-component-page#^1.0.0",
