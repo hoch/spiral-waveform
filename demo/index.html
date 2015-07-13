@@ -26,6 +26,11 @@
         padding: 1.0em;
         font-family: sans-serif;
       }
+
+      .container {
+        display: block;
+        height: 384px;
+      }
     </style>
   </head>
 
@@ -41,35 +46,51 @@
           amplitude ruler vertically.</p>
         <p>It also supports multi-channel audio buffer and the view port can be
           scrolled when the contents overflow the specified size.</p>
-        <p>This is design to be used with
+        <p>This element is designed to be used with
           <code>&lt;spiral-minimap&gt;</code>.</p>
 
       </div>
       <div class="element-demo">
 
         <!-- demo -->
-        <spiral-waveform id="renderer"></spiral-waveform>
-        <div id="dump"></div>
+        <button onclick="renderAudio()">Render Audio</button>
+        <br><br>
+
+        <div class="container">
+          <spiral-waveform id="eWaveform"></spiral-waveform>
+        </div>
+        <br>
+
+        <div id="eDump"></div>
 
       </div>
     </div>
 
     <script>
-      var renderer = document.querySelector('#renderer');
-      var container = document.querySelector('#dump');
+      var isReady = false;
+      var eWaveform, eDump;
 
-      var context = new OfflineAudioContext(3, 44100 * 0.5, 44100);
-      var timeout;
+      var controller = {
+        postMessage: function (id, type, data) {
+          eDump.textContent = id + '::' + type +
+            ' (' + data.start.toFixed(3) + ', ' + data.end.toFixed(3) + ')';
+        }
+      };
 
-      function generateBuffer() {
+      function renderAudio() {
+        if (!isReady)
+          return;
+
+        var context = new OfflineAudioContext(3, 44100 * 1, 44100);
+        
         var osc1 = context.createOscillator();
         var osc2 = context.createOscillator();
         var osc3 = context.createOscillator();
         var merger = context.createChannelMerger(3);
 
-        osc1.frequency.value = 55;
-        osc2.frequency.value = 55;
-        osc3.frequency.value = 55;
+        osc1.frequency.value = 5 * 11 * Math.random() + 11;
+        osc2.frequency.value = 3 * 13 * Math.random() + 13;
+        osc3.frequency.value = 7 * 17 * Math.random() + 17;
         osc2.type = 'sawtooth';
         osc3.type = 'square';
 
@@ -77,36 +98,22 @@
         osc2.connect(merger, 0, 1);
         osc3.connect(merger, 0, 2);
         merger.connect(context.destination);
+
         osc1.start();
         osc2.start();
         osc3.start();
-      }
 
-      function resizeToFit() {
-        var width = window.innerWidth * 0.95;
-        var height = 500;
-        renderer.setSize(width, height);
+        context.startRendering().then(function (buffer) {
+          eWaveform.setController(controller);
+          eWaveform.setAudioBuffer(buffer);
+          eWaveform.setViewRange(0.0, 0.8);
+        });
       }
-
-      var controller = {
-        postMessage: function (id, type, data) {
-          dump.textContent = id + '::' + type +
-            ' (' + data.start.toFixed(3) + ', ' + data.end.toFixed(3) + ')';
-        }
-      };
 
       window.addEventListener('WebComponentsReady', function () {
-        generateBuffer();
-        context.startRendering().then(function (buffer) {
-          renderer.setController(controller);
-          renderer.setAudioBuffer(buffer);
-          resizeToFit();
-        });
-      });
-
-      window.addEventListener('resize', function () {
-        clearTimeout(timeout);
-        timeout = setTimeout(resizeToFit, 250);
+        eWaveform = document.querySelector('#eWaveform');
+        eDump = document.querySelector('#eDump');
+        isReady = true;
       });
     </script>
 
