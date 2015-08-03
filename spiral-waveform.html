@@ -155,10 +155,14 @@ Example:
 
     _createModules: function () {
       // ASSERT(this._audioBuffer);
+      
+      // Initialize view port.
+      this._viewStart = 0;
+      this._viewEnd = this._audioBuffer.duration;
 
       // Create TimeRuler.
       this._timeRuler = SpiralWaveform.createTimeRuler(this._ctxTimeRuler,
-        0, 0, this._width, this._heightTimeRuler);
+        this._widthAmpRuler, 0, this._width, this._heightTimeRuler);
 
       // Create AmpRulers and WaveformDrawers.
       var numChannels = this._audioBuffer.numberOfChannels;
@@ -170,7 +174,7 @@ Example:
         this._ampRulers[i] = SpiralWaveform.createAmpRuler(this._ctxWaveform,
           0, yOffset, this._widthAmpRuler, this._heightChannel);
         this._waveformDrawers[i] = SpiralWaveform.createWaveformDrawer(this._ctxWaveform,
-          0, yOffset, this._width, this._heightChannel);
+          this._widthAmpRuler, yOffset, this._width, this._heightChannel);
         this._waveformDrawers[i].setSampleData(channelData, this._audioBuffer.sampleRate);
       }
     },
@@ -184,14 +188,7 @@ Example:
       var rect = this.getBoundingClientRect();
       this._width = (rect.width || this._width);
       this._height = this.parentNode.clientHeight;
-      // this._height = (this.parentNode.clientHeight || this._height);
       
-      // this._height = rect.height;
-      // console.log(this.parentNode.clientHeight);
-
-      // Forcibly update the size of waveform container div. This is needed to
-      // get the calculated |clientWidth| later.
-      // 
       // TODO: handle the height properly.
       this.$.eWaveformContainer.style.width = this._width + 'px';
       this.$.eWaveformContainer.style.height = (this._height - this._heightTimeRuler) + 'px';
@@ -226,7 +223,7 @@ Example:
       // If absPeak is not given and the buffer is available, calculate the peak
       // value.
       if (!absPeak && this._audioBuffer)
-        this._absPeak = this._findAbsolutePeak();
+        this._absPeak = this._findAbsolutePeak() * 1.075;
       else
         this._absPeak = absPeak;
 
@@ -243,6 +240,12 @@ Example:
       }
       
       this._timeRuler.draw(this._viewStart, this._viewEnd);
+
+      // Cleaning up no man's land. (left-upper corder)
+      // color: '#CFD8DC',
+      // colorShadow: '#607D8B',
+      this._ctxTimeRuler.fillStyle = '#90A4AE';
+      this._ctxTimeRuler.fillRect(0, 0, this._widthAmpRuler, this._heightTimeRuler);
     },
 
 
@@ -400,7 +403,7 @@ Example:
         return;
 
       this._audioBuffer = audioBuffer;
-
+      
       // Create modules with the buffer and resize manually.
       this._createModules();
       this._onResize();
