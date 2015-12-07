@@ -1,0 +1,44 @@
+{
+  "name": "spiral-waveform",
+  "authors": [
+    "Hongchan Choi <hongchan.choi@gmail.com>"
+  ],
+  "description": "A Polymer element draws an interactive multi-channel waveform of AudioBuffer",
+  "keywords": [
+    "web-component",
+    "web-components",
+    "polymer",
+    "audio",
+    "spiral",
+    "web-audio",
+    "waveform",
+    "time-domain",
+    "multi-channel"
+  ],
+  "main": "spiral-waveform.html",
+  "license": "http://polymer.github.io/LICENSE.txt",
+  "homepage": "https://github.com/hoch/spiral-waveform/",
+  "ignore": [
+    "/.*",
+    "/test/",
+    "/demo/"
+  ],
+  "dependencies": {
+    "polymer": "Polymer/polymer#^1.2.3",
+    "iron-resizable-behavior": "PolymerElements/iron-resizable-behavior#^1.0.2"
+  },
+  "devDependencies": {
+    "iron-component-page": "PolymerElements/iron-component-page#^1.1.2",
+    "web-component-tester": "*"
+  },
+  "_release": "1a7f2138b9",
+  "_resolution": {
+    "type": "branch",
+    "branch": "master",
+    "commit": "1a7f2138b93b7b508f70b8126459fd5b4ef5fafa"
+  },
+  "_source": "git://github.com/hoch/spiral-waveform.git",
+  "_target": "master",
+  "_originalSource": "hoch/spiral-waveform",
+  "_direct": true
+}
